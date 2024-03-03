@@ -370,7 +370,7 @@ void DrawResult::drawGround(cv::Mat &result, vector<Vector3f> &point_cloud, Vect
 {
     Eigen::Matrix3f RIC;
     RIC = Utility::ypr2R(Vector3d(RIC_y,RIC_p,RIC_r)).cast<float>();
-    cv::Mat aa(HEIGHT,WIDTH,CV_8UC3,Scalar(0,0,0));
+    cv::Mat aa(HEIGHT,WIDTH,CV_8UC4,Scalar(0,0,0));
     result = aa;
     
     std::vector<Vec2f_> points;
@@ -515,7 +515,7 @@ void DrawResult::drawBox(cv::Mat &result, Vector3f corner_0, Vector3f corner_x, 
 
 void DrawResult::drawAR(cv::Mat &result, vector<Vector3f> &point_cloud, Vector3f P_latest, Matrix3f R_latest)
 {
-    cv::Mat aa(HEIGHT,WIDTH,CV_8UC3,Scalar(0,0,0));
+    cv::Mat aa(HEIGHT,WIDTH,CV_8UC4,Scalar(0,0,0));
     result = aa;
     Eigen::Matrix3f RIC;
     RIC = Utility::ypr2R(Vector3d(RIC_y,RIC_p,RIC_r)).cast<float>();
@@ -943,7 +943,7 @@ cv::Point2f DrawResult::World2VirturCam(Eigen::Vector3f xyz, float &depth)
 void DrawResult::Reprojection(cv::Mat &result, vector<Vector3f> &point_cloud, const Matrix3f *R_window,const Vector3f *T_window, bool box_in_trajectorty)
 {
     float depth_marker;
-    cv::Mat aa(WIDTH,HEIGHT,CV_8UC3,Scalar(242,242,242));
+    cv::Mat aa(WIDTH,HEIGHT,CV_8UC4,Scalar(242,242,242,255));
     result = aa;
     
     Eigen::Matrix3f RIC;

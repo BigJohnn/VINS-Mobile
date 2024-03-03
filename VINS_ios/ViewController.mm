@@ -9,7 +9,7 @@
 #import "ViewController.h"
 #import "utility.hpp"
 #import "CameraUtils.h"
-
+#import <Foundation/Foundation.h>
 @interface ViewController ()
 @property (weak, nonatomic) IBOutlet UILabel *X_label;
 @property (weak, nonatomic) IBOutlet UILabel *Y_label;
@@ -70,7 +70,7 @@ KEYFRAME_DATA vinsData;
 // true: AR image is the main view, VINS is in left bottom
 bool ui_main = false;
 
-bool box_in_AR = false;
+bool box_in_AR = true;
 
 bool box_in_trajectory = false;
 
@@ -205,6 +205,13 @@ bool cameraMode = true;
 bool imageCacheEnabled = cameraMode && !USE_PNP;
 
 
+void export2File(Mat const& image, const char* filename) {
+    NSString* tmppath = NSFileManager.defaultManager.temporaryDirectory.path;
+    cv::Mat tmp;
+    cvtColor(image, tmp, CV_RGBA2RGB);
+    imwrite(String(tmppath.cString)+String("/") + filename, tmp);
+}
+
 // MARK: ViewController Methods
 
 - (void)viewDidLoad {
@@ -230,7 +237,15 @@ bool imageCacheEnabled = cameraMode && !USE_PNP;
     isCapturing = NO;
     
     [CameraUtils setExposureOffset: -1.0f];
-    [videoCamera start];
+    
+//    dispatch_queue_t session_queue = dispatch_queue_create("myqueue", DISPATCH_QUEUE_SERIAL);
+//    dispatch_async(session_queue, ^{
+        [videoCamera start];
+        frameSize = cv::Size(videoCamera.imageWidth,
+                             videoCamera.imageHeight);
+//    });
+//    [videoCamera start];
+    
     
     /***************************************UI configuration*****************************************/
     UIPanGestureRecognizer *resultPanGestureRecognizer = [[UIPanGestureRecognizer alloc]
@@ -340,8 +355,8 @@ bool imageCacheEnabled = cameraMode && !USE_PNP;
         isCapturing = YES;
         [mainLoop start];
         motionManager = [[CMMotionManager alloc] init];
-        frameSize = cv::Size(videoCamera.imageWidth,
-                             videoCamera.imageHeight);
+//        frameSize = cv::Size(videoCamera.imageWidth,
+//                             videoCamera.imageHeight);
     }
 }
 
@@ -363,6 +378,8 @@ Matrix3d pnp_R;
 
 - (void)processImage:(cv::Mat&)image
 {
+    export2File(image, "input_frame.png");
+
     if(isCapturing == YES)
     {
         //NSLog(@"image processing");
@@ -382,8 +399,8 @@ Matrix3d pnp_R;
         
         if(lateast_imu_time <= 0)
         {
-            cv::cvtColor(image, image, CV_BGRA2RGB);
-            cv::flip(image,image,-1);
+//            cv::cvtColor(image, image, CV_BGRA2RGB);
+//            cv::flip(image,image,-1);
             return;
         }
         //img_msg->header = lateast_imu_time;
@@ -476,7 +493,14 @@ Matrix3d pnp_R;
             if(imageCacheEnabled)
             {
                 image_data_cache.header = img_msg->header;
-                image_data_cache.image = MatToUIImage(image);
+                
+                NSString* tmppath = NSFileManager.defaultManager.temporaryDirectory.path;
+                cv::Mat tmp;
+                cvtColor(image, tmp, CV_RGBA2RGB);
+                imwrite(String(tmppath.cString)+"/input_image_with_kps.png", tmp);
+                
+                image_data_cache.image = MatToUIImage(tmp);
+                
                 image_pool.push(image_data_cache);
             }
             
@@ -516,6 +540,8 @@ Matrix3d pnp_R;
                     lateast_P = vins_pool.front().P;
                     lateast_R = vins_pool.front().R;
                     UIImageToMat(lateast_image, image);
+                    
+                    cvtColor(image, image, CV_RGB2RGBA);
                 }
             }
             else if(!image_pool.empty())
@@ -538,13 +564,16 @@ Matrix3d pnp_R;
                 vins.drawresult.startInit = true;
                 vins.drawresult.drawAR(vins.imageAI, vins.correct_point_cloud, lateast_P, lateast_R);
                 
-                cv::cvtColor(image, tmp, CV_RGBA2BGR);
+//                cv::cvtColor(image, tmp, CV_RGBA2BGR);
+                cv::cvtColor(image, tmp, CV_RGBA2BGRA);
                 cv::Mat mask;
                 cv::Mat imageAI = vins.imageAI;
                 if(!imageAI.empty())
-                    cv::cvtColor(imageAI, mask, CV_RGB2GRAY);
-                imageAI.copyTo(tmp,mask);
-                cv::cvtColor(tmp, image, CV_BGRA2BGR);
+                    cv::cvtColor(imageAI, mask, CV_RGBA2GRAY);
+                imageAI.copyTo(image,mask);
+//                imageAI.copyTo(tmp,mask);
+//                cv::cvtColor(tmp, image, CV_BGRA2BGR);
+                
             }
             if(DEBUG_MODE)
             {
@@ -555,7 +584,7 @@ Matrix3d pnp_R;
                 cv::flip(image,tmp2,-1);
                 image = tmp2;
                 if(vins.solver_flag != VINS::NON_LINEAR || !start_show)
-                    cv::cvtColor(image, image, CV_RGBA2BGR);
+                    cv::cvtColor(image, image, CV_RGBA2BGRA);
             }
         }
         else //show VINS
@@ -571,16 +600,16 @@ Matrix3d pnp_R;
             
             cv::Mat down_origin_image;
             cv::resize(image.t(), down_origin_image, cv::Size(200, 150));
-            cv::cvtColor(down_origin_image, down_origin_image, CV_BGRA2RGB);
+//            cv::cvtColor(down_origin_image, down_origin_image, CV_BGRA2RGB);
             cv::flip(down_origin_image,down_origin_image,0);
             cv::Mat imageROI;
             imageROI = tmp2(cv::Rect(10,COL - down_origin_image.rows- 10, down_origin_image.cols,down_origin_image.rows));
             cv::Mat mask;
-            cv::cvtColor(down_origin_image, mask, CV_RGB2GRAY);
+            cv::cvtColor(down_origin_image, mask, CV_RGBA2GRAY);
             down_origin_image.copyTo(imageROI, mask);
-            
-            
-            cv::cvtColor(tmp2, image, CV_BGRA2BGR);
+                        
+            cv::cvtColor(tmp2, image, CV_BGRA2RGBA);
+
             cv::flip(image,tmp2,1);
             if (isNeedRotation)
                 image = tmp2.t();
@@ -589,12 +618,14 @@ Matrix3d pnp_R;
         TE(visualize);
     } else {
         // Not capturing, means not started yet
-        cv::cvtColor(image, image, CV_BGRA2RGB);
+        cv::cvtColor(image, image, CV_BGRA2RGBA);
         cv::flip(image,image,-1);
         //BOOL isNeedRotation = image.size() != frameSize;
         //if (isNeedRotation)
         //    image = image.t();
     }
+    
+    export2File(image, "finalImg.png");
 }
 
 
@@ -1377,8 +1408,8 @@ vector<IMU_MSG> gyro_buf;  // for Interpolation
             vins.drawresult.Y0AR += vx_smooth/100.0;
             vins.drawresult.X0AR += vy_smooth/100.0;
             
-            vins.drawresult.locationXT2 = point.x * 640.0 / imageView.frame.size.width;
-            vins.drawresult.locationYT2 = point.y * 480.0 / imageView.frame.size.height;
+            vins.drawresult.locationXT2 = point.x * HEIGHT / imageView.frame.size.width;
+            vins.drawresult.locationYT2 = point.y * WIDTH / imageView.frame.size.height;
             
             vins.drawresult.finger_s = 0;
             vins.drawresult.finger_p = 0;
@@ -1392,8 +1423,8 @@ vector<IMU_MSG> gyro_buf;  // for Interpolation
             vins.drawresult.phyAR += vx_smooth/100.0;
             //vins.drawresult.phyAR = fmod(vins.drawresult.phyAR, 360.0);
             
-            vins.drawresult.locationX = point.x * 640.0 / imageView.frame.size.width;
-            vins.drawresult.locationY = point.y * 480.0 / imageView.frame.size.height;
+            vins.drawresult.locationX = point.x * HEIGHT / imageView.frame.size.width;
+            vins.drawresult.locationY = point.y * WIDTH / imageView.frame.size.height;
             
             vins.drawresult.finger_d = 0;
             vins.drawresult.finger_p = 0;
@@ -1433,8 +1464,8 @@ vector<IMU_MSG> gyro_buf;  // for Interpolation
             vins.drawresult.finger_state = 3;
         
         CGPoint point = [recognizer locationInView:self.view];
-        vins.drawresult.locationXP = point.x * 640.0 / imageView.frame.size.width;
-        vins.drawresult.locationYP = point.y * 480.0 / imageView.frame.size.height;
+        vins.drawresult.locationXP = point.x * HEIGHT / imageView.frame.size.width;
+        vins.drawresult.locationYP = point.y * WIDTH / imageView.frame.size.height;
         
         //NSLog(@"pipikk_radius: %f velocity: ", vins.drawresult.radiusAR, recognizer.velocity);
         
@@ -1460,8 +1491,8 @@ vector<IMU_MSG> gyro_buf;  // for Interpolation
          vins.drawresult.finger_state = 3;*/
         
         CGPoint point = [recognizer locationInView:self.view];
-        vins.drawresult.locationTapX = point.x * 640.0 / imageView.frame.size.width;
-        vins.drawresult.locationTapY = point.y * 480.0 / imageView.frame.size.height;
+        vins.drawresult.locationTapX = point.x * HEIGHT / imageView.frame.size.width;
+        vins.drawresult.locationTapY = point.y * WIDTH / imageView.frame.size.height;
         
         vins.drawresult.tapFlag = true;
         
@@ -1477,8 +1508,8 @@ vector<IMU_MSG> gyro_buf;  // for Interpolation
     }
     {
         CGPoint point = [recognizer locationInView:self.view];
-        vins.drawresult.locationLongPressX = point.x * 640.0 / imageView.frame.size.width;
-        vins.drawresult.locationLongPressY = point.y * 480.0 / imageView.frame.size.height;
+        vins.drawresult.locationLongPressX = point.x * HEIGHT / imageView.frame.size.width;
+        vins.drawresult.locationLongPressY = point.y * WIDTH / imageView.frame.size.height;
         vins.drawresult.longPressFlag = true;
     }
 }
@@ -1792,6 +1823,11 @@ DeviceType deviceName()
     {
         printf("Device iPad pro 12.9\n");
         device_type = iPadPro129;
+    }
+    else if(([device compare:@"iPhone11,6"] == NSOrderedSame))
+    {
+        printf("Device iPhoneXSMax\n");
+        device_type = iPhoneXSMax;
     }
     else
     {

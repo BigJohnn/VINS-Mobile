@@ -7,11 +7,12 @@
 //
 
 #include "feature_tracker.hpp"
-
+#include <opencv2/core/mat.hpp>
 int FeatureTracker::n_id = 0;
 FeatureTracker::FeatureTracker()
 :mask{ROW, COL, CV_8UC1},update_finished{false},img_cnt{0},current_time{-1.0},use_pnp{false}
 {
+    mask = cv::Mat(ROW, COL, CV_8UC1);
     printf("init ok\n");
 }
 /*********************************************************tools function for feature tracker start*****************************************************/
